@@ -22,8 +22,8 @@
 - [x] 1.1 - Basic Keywords (SELECT, FROM, LIMIT)
 - [x] 1.2 - WHERE & Filtering
 - [x] 1.3 - Operators (Comparison & Logical)
-- [ ] 1.4 - Wildcards & LIKE (IN PROGRESS)
-- [ ] 1.4b - Aliases (AS keyword)
+- [x] 1.4 - Wildcards & LIKE 
+- [x] 1.4b - Aliases (AS keyword) (IN PROGRESS)
 - [ ] 1.5 - Arithmetic Operators
 - [ ] 1.6 - Aggregate Functions
 - [ ] 1.6b - GROUP BY Clause
@@ -91,11 +91,11 @@
 ## 📈 Overall Progress
 
 ```
-Part 1 Completed: 5/24 lessons (21%)
+Part 1 Completed: 7/24 lessons (29%)
 Part 2 Completed: 0/16 lessons (0%)
-Total: 5/40 lessons (12.5%)
+Total: 7/40 lessons (17.5%)
 
-████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 12.5%
+███████░░░░░░░░░░░░░░░░░░░░░░░░░ 17.5%
 ```
 
 ---
@@ -338,44 +338,205 @@ Other tables (will use later):
 
 ---
 
----
-
 ## Lesson 1.4 - Wildcards & LIKE
 
-**What it does:**
+**What it does:**  
+Pattern matching for text using % (zero or more characters) and _ (exactly one character) to search for partial matches in text columns
 
 **Syntax:**
 ```sql
-
+SELECT column
+FROM table
+WHERE column LIKE 'pattern%';    -- % = 0 or more chars
+WHERE column LIKE '_pattern_';   -- _ = exactly 1 char
+WHERE column LIKE '%pattern%';   -- pattern anywhere
 ```
 
-**Real examples:**
-```sql
+**Real examples (tested on MotherDuck):**
 
+Example 1 - Find all job titles containing "data":
+```sql
+SELECT DISTINCT job_title_short
+FROM job_postings_fact
+WHERE job_title LIKE '%data%'
+LIMIT 10;
+```
+
+Example 2 - Find Columbus jobs in any US state (CO, OH, etc.):
+```sql
+SELECT DISTINCT job_location
+FROM job_postings_fact
+WHERE job_location LIKE 'Columbus, __'
+LIMIT 10;
+```
+
+Example 3 - Find roles with both "data" and "engineer" in title:
+```sql
+SELECT job_title, job_title_short
+FROM job_postings_fact
+WHERE job_title LIKE '%data%' 
+  AND job_title LIKE '%engineer%'
+LIMIT 10;
+```
+
+Example 4 - Find analyst roles (data analyst, business analyst, etc.):
+```sql
+SELECT DISTINCT job_title_short
+FROM job_postings_fact
+WHERE job_title LIKE '%analyst%'
+LIMIT 10;
+```
+
+Example 5 - Find remote data engineer jobs combining LIKE with WHERE:
+```sql
+SELECT job_id, job_title, job_location
+FROM job_postings_fact
+WHERE job_title_short = 'Data Engineer'
+  AND job_title LIKE '%remote%'
+LIMIT 10;
 ```
 
 **Key things to remember:**
+- `%` = zero, one, or more characters (wildcard)
+- `_` = exactly one character (single placeholder)
+- Case-insensitive in DuckDB (Data = data = DATA)
+- IN operator does NOT work with wildcards — use LIKE + OR instead
+- LIKE requires WHERE clause (not SELECT, FROM, or other parts)
+- Can combine multiple LIKE conditions with AND/OR
+- Performance tip: `LIKE '%text%'` is slower than `LIKE 'text%'` (put wildcard at end when possible)
 
 ---
 
 ## Lesson 1.4b - Aliases (AS Keyword)
 
-**What it does:**
+**What it does:**  
+Rename columns and tables temporarily to make queries more readable and understandable. Aliases only exist for that query — they don't change the actual table/column names in the database.
 
 **Syntax:**
 ```sql
+-- Column alias
+SELECT column_name AS new_name
+FROM table_name;
 
+-- Table alias
+SELECT t.column_name
+FROM table_name AS t;
+
+-- Table alias without AS (also works)
+SELECT t.column_name
+FROM table_name t;
 ```
 
-**Real examples:**
-```sql
+**Real examples (tested on MotherDuck):**
 
+Example 1 - Rename columns for clarity:
+```sql
+SELECT 
+  job_id AS id,
+  job_title_short AS role,
+  salary_year_average AS annual_salary,
+  job_work_from_home AS is_remote
+FROM job_postings_fact
+LIMIT 5;
+```
+
+Example 2 - Use table alias to avoid repeating long table name:
+```sql
+SELECT 
+  j.job_id,
+  j.job_title_short,
+  j.salary_year_average
+FROM job_postings_fact AS j
+WHERE j.salary_year_average > 100000
+LIMIT 10;
+```
+
+Example 3 - Table alias without AS keyword (shorter, also common):
+```sql
+SELECT 
+  j.job_id,
+  j.job_title,
+  j.job_country
+FROM job_postings_fact j
+WHERE j.job_country = 'United States'
+LIMIT 10;
+```
+
+Example 4 - Multiple aliases for readability:
+```sql
+SELECT 
+  j.job_id AS job_posting_id,
+  j.job_title_short AS role_type,
+  j.salary_year_average AS yearly_pay,
+  j.job_location AS location
+FROM job_postings_fact j
+WHERE j.job_work_from_home = true
+LIMIT 10;
+```
+
+Example 5 - Alias with LIKE pattern matching:
+```sql
+SELECT 
+  j.job_id,
+  j.job_title AS original_title,
+  j.job_title_short AS cleaned_title
+FROM job_postings_fact j
+WHERE j.job_title LIKE '%data%engineer%'
+LIMIT 10;
 ```
 
 **Key things to remember:**
+- Aliases are **temporary** — only for that specific query
+- Use AS keyword for clarity (best practice)
+- Can omit AS keyword (FROM table_name t is same as FROM table_name AS t)
+- Column aliases useful for renaming long names (salary_year_average → salary)
+- Table aliases essential when joining tables (will use heavily in lesson 1.8)
+- Aliases come after SELECT (columns) and FROM (tables)
+- Can reference alias in ORDER BY and LIMIT, but **not always** in WHERE (depends on database)
+- DuckDB allows alias in WHERE/GROUP BY/HAVING (friendly), but other databases may not
+- **Best practice:** Use table aliases when table names are long or when joining multiple tables
+- Alias names should be meaningful (j = job postings fact, c = company dim, not x, y, z)
 
 ---
 
+## Summary: When to Use Each
+
+| Lesson | Use Case | Example |
+|--------|----------|---------|
+| **1.4 - LIKE** | Find text patterns | `WHERE job_title LIKE '%engineer%'` |
+| **1.4b - Aliases** | Make queries readable | `SELECT salary AS pay FROM table` |
+
+---
+
+## Quick Practice (Do These on MotherDuck)
+
+After reading the examples, try these queries:
+
+```sql
+-- Practice LIKE wildcards
+SELECT DISTINCT job_location
+FROM job_postings_fact
+WHERE job_location LIKE '%York%'
+LIMIT 10;
+
+-- Practice aliases
+SELECT 
+  job_id AS posting_id,
+  job_title_short AS position,
+  salary_year_average AS pay
+FROM job_postings_fact
+LIMIT 5;
+
+-- Combine both
+SELECT 
+  j.job_id AS id,
+  j.job_title AS title,
+  j.salary_year_average AS salary
+FROM job_postings_fact j
+WHERE j.job_title LIKE '%Python%'
+LIMIT 10;
+```
+---
 ## Lesson 1.5 - Arithmetic Operators
 
 **What it does:**
